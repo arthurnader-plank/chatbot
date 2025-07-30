@@ -1,31 +1,31 @@
 "use client";
 import { useState } from "react";
-import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
 
-export default function LoginPage() {
+export default function SignupPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
-    const { error } = await supabase.auth.signInWithPassword({
+    const { error } = await supabase.auth.signUp({
       email,
       password,
     });
 
     if (error) {
-      alert(`Login failed: ${error.message}`);
+      alert(`Signup failed: ${error.message}`);
     } else {
-      window.location.href = "/chat";
+      alert("Signup successful! Please check your email to confirm.");
+      window.location.href = "/login";
     }
   };
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-gray-100">
       <div className="w-full max-w-md bg-white p-8 rounded-lg shadow text-black">
-        <h1 className="text-2xl font-bold mb-6 text-center">Login</h1>
-        <form onSubmit={handleLogin} className="space-y-4">
+        <h1 className="text-2xl font-bold mb-6 text-center">Sign Up</h1>
+        <form onSubmit={handleSignup} className="space-y-4">
           <div>
             <label htmlFor="email" className="block text-sm font-medium mb-1">
               Email
@@ -54,17 +54,11 @@ export default function LoginPage() {
           </div>
           <button
             type="submit"
-            className="w-full bg-blue-600 text-white rounded py-2 hover:bg-blue-700"
+            className="w-full bg-green-600 text-white rounded py-2 hover:bg-green-700"
           >
-            Login
+            Sign Up
           </button>
         </form>
-        <p className="text-center text-sm text-black mt-4">
-          Don’t have an account?{" "}
-          <Link href="/signup" className="text-blue-600 hover:underline">
-            Sign up
-          </Link>
-        </p>
       </div>
     </main>
   );
