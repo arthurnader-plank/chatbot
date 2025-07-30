@@ -60,3 +60,28 @@ export async function fetchUserConversations(userId: string) {
     if (error) throw error;
     return data;
   }
+
+  export async function appendMessageToConversation(
+    conversationId: string,
+    newMessage: { sender: string; text: string }
+  ) {
+    const { data, error } = await supabase
+      .from("chats")
+      .select("messages")
+      .eq("id", conversationId)
+      .single();
+  
+    if (error) throw error;
+  
+    const messages = data?.messages ?? [];
+    const updatedMessages = [...messages, newMessage];
+  
+    const { error: updateError } = await supabase
+      .from("chats")
+      .update({ messages: updatedMessages })
+      .eq("id", conversationId);
+  
+    if (updateError) throw updateError;
+  
+    return updatedMessages;
+  }

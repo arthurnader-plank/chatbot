@@ -2,7 +2,8 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
-import { fetchUserConversations, createNewConversation, loadConversation, updateConversation } from "@/lib/chats";
+import { fetchUserConversations, createNewConversation, loadConversation, updateConversation, appendMessageToConversation } from "@/lib/chats";
+import { chatAgent } from "@/lib/langgraphAgent";
 
 interface Message {
   id: number;
@@ -84,23 +85,46 @@ export default function ChatPage() {
     syncMessages();
   }, [messages, activeConversationId]);
 
-  const sendMessage = (e: React.FormEvent) => {
+  const sendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!input.trim()) return;
+    if (!input.trim() || !activeConversationId) return;
   
-    setMessages((prev) => [
-      ...prev,
-      { id: Date.now(), sender: "user", text: input.trim() }
-    ]);
-  
-    setTimeout(() => {
-      setMessages((prev) => [
-        ...prev,
-        { id: Date.now() + 1, sender: "bot", text: "This is a bot reply." }
-      ]);
-    }, 600);
+    // --- 1. Add user message to UI and DB ---
+    const userMessage = { id: Date.now(), sender: "user", text: input.trim() };
+    setMessages((prev) => [...prev, userMessage]);
+    await appendMessageToConversation(activeConversationId, {
+      sender: "user",
+      text: input.trim(),
+    });
   
     setInput("");
+  
+    try {
+      // --- 2. Call server API route ---
+      const response = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          conversationId: activeConversationId,
+          input: input.trim(),
+        }),
+      }).then((res) => res.json());
+  
+      if (response.error) {
+        console.error("Chat error:", response.error);
+        return;
+      }
+  
+      // --- 3. Add bot message to UI and DB ---
+      const botMessage = { id: Date.now() + 1, sender: "bot", text: response.output };
+      setMessages((prev) => [...prev, botMessage]);
+      await appendMessageToConversation(activeConversationId, {
+        sender: "bot",
+        text: response.output,
+      });
+    } catch (error) {
+      console.error("Error sending message:", error);
+    }
   };
   
 
