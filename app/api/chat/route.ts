@@ -1,18 +1,25 @@
 import { NextResponse } from "next/server";
 import { ChatOpenAI } from "@langchain/openai";
 import {
-  BaseMessage,
   HumanMessage,
   AIMessage,
   SystemMessage,
 } from "@langchain/core/messages";
 import {
   StateGraph,
-  Annotation,
   START,
   END,
+  Annotation
 } from "@langchain/langgraph";
 import { loadConversation } from "@/lib/chats";
+
+import type { BaseMessage } from "@langchain/core/messages";
+
+interface DBMessage {
+  id: number;
+  sender: string;
+  text: string;
+}
 
 // 1️⃣ Define State schema with automatic appending of messages
 const StateAnnotation = Annotation.Root({
@@ -34,7 +41,7 @@ async function llmNode(
     openAIApiKey: process.env.OPENAI_API_KEY,
   });
   const response = await model.invoke(state.messages);
-  return { messages: [new AIMessage(response.content)] };
+  return { messages: [new AIMessage(response.text)] };
 }
 
 // 3️⃣ Build the graph
@@ -60,7 +67,7 @@ export async function POST(req: Request) {
   const initState = {
     messages: [
       systemPrompt,
-      ...history.map((m: any) =>
+      ...history.map((m: DBMessage) =>
         m.sender === "user" ? new HumanMessage(m.text) : new AIMessage(m.text)
       ),
       new HumanMessage(input),

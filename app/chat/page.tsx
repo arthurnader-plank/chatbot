@@ -1,13 +1,20 @@
 "use client";
+
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabaseClient";
-import { fetchUserConversations, createNewConversation, loadConversation, updateConversation, appendMessageToConversation } from "@/lib/chats";
-import { chatAgent } from "@/lib/langgraphAgent";
 
-interface Message {
+import { supabase } from "@/lib/supabaseClient";
+import {
+  appendMessageToConversation,
+  createNewConversation,
+  fetchUserConversations,
+  loadConversation,
+} from "@/lib/chats";
+
+
+interface DBMessage {
   id: number;
-  sender: "user" | "bot";
+  sender: string;
   text: string;
 }
 
@@ -21,7 +28,7 @@ export default function ChatPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [messages, setMessages] = useState<DBMessage[]>([]);
   const [input, setInput] = useState("");
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
 
@@ -41,6 +48,12 @@ export default function ChatPage() {
   useEffect(() => {
     const fetchConversationsList = async () => {
       const { data: { user } } = await supabase.auth.getUser();
+
+      if (!user) {
+        console.log("No user logged in");
+        return;
+      }
+      
       console.log(user.id);
       if (!user) return;
 
@@ -134,7 +147,7 @@ export default function ChatPage() {
     setActiveConversationId(conversationId);
     const conversation = await loadConversation(conversationId);
     setMessages(
-      (conversation.messages || []).map((m: any, i: number) => ({
+      (conversation.messages || []).map((m: DBMessage, i: number) => ({
         id: i,
         sender: m.sender,
         text: m.text,
@@ -148,12 +161,14 @@ export default function ChatPage() {
       <aside className="w-64 bg-gray-200 p-4 hidden md:flex flex-col">
         <div className="flex space-x-2 mb-4">
           <button
+            type="button"
             onClick={newChat}
             className="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
           >
             + New Chat
           </button>
           <button
+            type="button"
             onClick={handleLogout}
             className="px-3 py-2 bg-red-400 text-white rounded hover:bg-red-700"
           >
@@ -164,13 +179,14 @@ export default function ChatPage() {
         <div className="space-y-2">
           {conversations.length > 0 ? (
             conversations.map((conv) => (
-              <div
+              <button
+                type="button"  
                 key={conv.id}
                 className="p-2 bg-white rounded shadow hover:bg-gray-100  text-black cursor-pointer"
                 onClick={() => handleLoadConversation(conv.id)}
               >
                 {conv.title}
-              </div>
+              </button>
             ))
           ) : (
             <p className="text-sm text-black">No previous conversations</p>

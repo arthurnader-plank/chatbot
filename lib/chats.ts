@@ -1,5 +1,11 @@
 import { supabase } from "@/lib/supabaseClient";
 
+interface DBMessage {
+  id: number;
+  sender: string;
+  text: string;
+}
+
 export async function createNewConversation(userId: string) {
   const { data, error } = await supabase
     .from("chats")
@@ -50,7 +56,7 @@ export async function fetchUserConversations(userId: string) {
     return data;
   }
 
-  export async function updateConversation(conversationId: string, messages: any[]) {
+  export async function updateConversation(conversationId: string, messages: DBMessage[]) {
     const { data, error } = await supabase
       .from("chats")
       .update({ messages })
