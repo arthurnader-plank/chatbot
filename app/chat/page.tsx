@@ -21,9 +21,7 @@ export default function ChatPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [messages, setMessages] = useState<Message[]>([
-    { id: 1, sender: "bot", text: "Hello! How can I help you today?" },
-  ]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
 
@@ -63,27 +61,6 @@ export default function ChatPage() {
     window.location.href = "/";
   };
 
-  useEffect(() => {
-    if (!activeConversationId) return; // No conversation selected yet
-    if (messages.length === 0) return; // Nothing to save
-  
-    const syncMessages = async () => {
-      try {
-        // Remove local-only `id` (optional)
-        const formattedMessages = messages.map(({ sender, text }) => ({
-          sender,
-          text,
-          timestamp: new Date().toISOString(),
-        }));
-  
-        await updateConversation(activeConversationId, formattedMessages);
-      } catch (error) {
-        console.error("Failed to update conversation:", error);
-      }
-    };
-  
-    syncMessages();
-  }, [messages, activeConversationId]);
 
   const sendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -140,9 +117,10 @@ export default function ChatPage() {
 
       // Update sidebar conversations list
       setConversations((prev) => [conversation, ...prev]);
+      setActiveConversationId(conversation.id);
   
       // Reset local chat messages for this conversation
-      setMessages([{ id: Date.now(), sender: "bot", text: "New chat started." }]);
+      setMessages([]);
     } catch (error) {
       console.error("Error creating conversation:", error);
     }
