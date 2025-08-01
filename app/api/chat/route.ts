@@ -19,6 +19,7 @@ interface DBMessage {
   id: number;
   sender: string;
   text: string;
+  route?: string;
 }
 
 // 1️⃣ Define State schema with automatic appending of messages
@@ -29,30 +30,78 @@ const StateAnnotation = Annotation.Root({
     },
     default: () => [],
   }),
+  route: Annotation<string>({ default: () => "chat" }),
+  weather: Annotation<string | null>({ default: () => null }),
+  news: Annotation<string | null>({ default: () => null }),
 });
 
-// 2️⃣ Define the Node function that calls the LLM
-async function llmNode(
-  state: { messages: BaseMessage[] }
-): Promise<{ messages: BaseMessage[] }> {
-  const model = new ChatOpenAI({
-    modelName: "gpt-4o-mini",
-    temperature: 0.7,
-    openAIApiKey: process.env.OPENAI_API_KEY,
-  });
-  const response = await model.invoke(state.messages);
-  return { messages: [new AIMessage(response.text)] };
+// 2️⃣ Router Node (LLM-based)
+async function routerNode(state: { messages: BaseMessage[] }) {
+  const routerModel = new ChatOpenAI({ modelName: "gpt-4o-mini", temperature: 0 });
+  const system = new SystemMessage(
+    "Classify the user's query into one of the following: weather, news, chat. Respond with only one word."
+  );
+
+  const lastUserMessage = state.messages.findLast(m => m instanceof HumanMessage);
+  const response = await routerModel.invoke([system, lastUserMessage!]);
+  const route = response.content.trim().toLowerCase();
+  console.log(route);
+  return { route };
+}
+
+async function weatherNode() {
+  // Example static data (replace with real API)
+  console.log("weatherNode activated");
+  const data = "It's 24°C and sunny in London.";
+  return { weather: data };
+}
+
+
+
+// 4️⃣ News Node
+async function newsNode() {
+  // Example static data (replace with real API)
+  console.log("newsNode activated");
+  const data = "Top headline: 'AI revolutionizes everything again!'";
+  return { news: data };
+}
+
+async function chatNode(state: { messages: BaseMessage[]; weather?: string; news?: string }) {
+  const model = new ChatOpenAI({ modelName: "gpt-4o-mini", temperature: 0.7 });
+
+  const contextMessages: BaseMessage[] = [];
+  console.log(state.weather);
+  if (state.weather) contextMessages.push(new AIMessage(`Weather info: ${state.weather}`));
+  if (state.news) contextMessages.push(new AIMessage(`News info: ${state.news}`));
+
+  const response = await model.invoke([
+    ...state.messages,
+    ...contextMessages
+  ]);
+
+  return { messages: [new AIMessage(response.content)] };
 }
 
 // 3️⃣ Build the graph
-const graph = new StateGraph(StateAnnotation)
-  .addNode("llm", llmNode)
-  .addEdge(START, "llm")
-  .addEdge("llm", END)
+// 6️⃣ Graph definition
+const graph = new StateGraph(StateAnnotation) // Defines the entry point
+  .addNode("router", routerNode)
+  .addNode("weatherNode", weatherNode)
+  .addNode("newsNode", newsNode)
+  .addNode("chat", chatNode)
+  .addConditionalEdges("router", (state) => state.route, {
+    weather: "weatherNode",
+    news: "newsNode",
+    chat: "chat"
+  })
+  .addEdge(START, "router")
+  .addEdge("chat", END)
+  .addEdge("weatherNode", "chat")
+  .addEdge("newsNode", "chat")
   .compile();
 
 export async function POST(req: Request) {
-  const { conversationId, input } = await req.json();
+  const { conversationId } = await req.json();
 
   // Fetch history from Supabase
   const conversation = await loadConversation(conversationId);
@@ -60,7 +109,7 @@ export async function POST(req: Request) {
 
   const systemPrompt = new SystemMessage(
     "You are Jim Morrison, a famous poet and singer of The Doors. " +
-      "Respond with deep, philosophical, and poetic answers, blending mystery and insight into every response."
+    "Respond with poetic answers, blending a bit of mystery and insight into every response."
   );
 
   // 4️⃣ Build the initial state with system prompt + history + new input
@@ -70,12 +119,12 @@ export async function POST(req: Request) {
       ...history.map((m: DBMessage) =>
         m.sender === "user" ? new HumanMessage(m.text) : new AIMessage(m.text)
       ),
-      new HumanMessage(input),
     ],
   };
 
   // 5️⃣ Invoke the graph & extract last message
   const result = await graph.invoke(initState);
   const last = result.messages[result.messages.length - 1];
-  return NextResponse.json({ output: last.content });
+
+  return NextResponse.json({ output: last.content, route:result.route });
 }

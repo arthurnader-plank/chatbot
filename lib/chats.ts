@@ -69,7 +69,7 @@ export async function fetchUserConversations(userId: string) {
 
   export async function appendMessageToConversation(
     conversationId: string,
-    newMessage: { sender: string; text: string }
+    newMessage: { sender: string; text: string, route?:string }
   ) {
     const { data, error } = await supabase
       .from("chats")

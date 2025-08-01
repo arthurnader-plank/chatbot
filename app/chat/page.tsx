@@ -16,6 +16,7 @@ interface DBMessage {
   id: number;
   sender: string;
   text: string;
+  route?: string;
 }
 
 interface Conversation {
@@ -96,7 +97,6 @@ export default function ChatPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           conversationId: activeConversationId,
-          input: input.trim(),
         }),
       }).then((res) => res.json());
   
@@ -106,11 +106,12 @@ export default function ChatPage() {
       }
   
       // --- 3. Add bot message to UI and DB ---
-      const botMessage = { id: Date.now() + 1, sender: "bot", text: response.output };
+      const botMessage = { id: Date.now() + 1, sender: "bot", text: response.output, route: response.route };
       setMessages((prev) => [...prev, botMessage]);
       await appendMessageToConversation(activeConversationId, {
         sender: "bot",
         text: response.output,
+        route: response.route,
       });
     } catch (error) {
       console.error("Error sending message:", error);
@@ -151,6 +152,7 @@ export default function ChatPage() {
         id: i,
         sender: m.sender,
         text: m.text,
+        route: m.route,
       }))
     );
   };
@@ -182,7 +184,12 @@ export default function ChatPage() {
               <button
                 type="button"  
                 key={conv.id}
-                className="p-2 bg-white rounded shadow hover:bg-gray-100  text-black cursor-pointer"
+                className={`p-2 rounded shadow text-black cursor-pointer transition 
+                  ${
+                    activeConversationId === conv.id
+                      ? "bg-blue-500 text-white" // highlight active conversation
+                      : "bg-white hover:bg-gray-100"
+                  }`}
                 onClick={() => handleLoadConversation(conv.id)}
               >
                 {conv.title}
@@ -207,6 +214,10 @@ export default function ChatPage() {
                 className={`px-4 py-2 rounded-lg ${
                   msg.sender === "user"
                     ? "bg-blue-200 text-black"
+                    : msg.route === "weather"
+                    ? "bg-orange-200 text-black"
+                    : msg.route === "news"
+                    ? "bg-green-200 text-black"
                     : "bg-gray-300 text-black"
                 }`}
               >
