@@ -30,11 +30,19 @@ const StateAnnotation = Annotation.Root({
     },
     default: () => [],
   }),
-  route: Annotation<string>({ default: () => "chat" }),
-  weather: Annotation<string | null>({ default: () => null }),
-  news: Annotation<string | null>({ default: () => null }),
+  route: Annotation<string>({
+    value: (_existing, update) => update,  
+    default: () => "chat",
+  }),
+  weather: Annotation<string | null>({
+    value: (_existing, update) => update, 
+    default: () => null,
+  }),
+  news: Annotation<string | null>({
+    value: (_existing, update) => update,  
+    default: () => null,
+  }),
 });
-
 // 2️⃣ Router Node (LLM-based)
 async function routerNode(state: { messages: BaseMessage[] }) {
   const routerModel = new ChatOpenAI({ modelName: "gpt-4o-mini", temperature: 0 });
@@ -43,8 +51,15 @@ async function routerNode(state: { messages: BaseMessage[] }) {
   );
 
   const lastUserMessage = state.messages.findLast(m => m instanceof HumanMessage);
-  const response = await routerModel.invoke([system, lastUserMessage!]);
-  const route = response.content.trim().toLowerCase();
+
+  if (!lastUserMessage) {
+    console.warn("No HumanMessage found in state.messages");
+    return { route: "chat" }; // fallback route
+  }
+
+
+  const response = await routerModel.invoke([system, lastUserMessage]);
+  const route = String(response.content).trim().toLowerCase();
   console.log(route);
   return { route };
 }
@@ -79,7 +94,7 @@ async function chatNode(state: { messages: BaseMessage[]; weather?: string; news
     ...contextMessages
   ]);
 
-  return { messages: [new AIMessage(response.content)] };
+  return { messages: [new AIMessage(String(response.content))] };
 }
 
 // 3️⃣ Build the graph
@@ -109,7 +124,7 @@ export async function POST(req: Request) {
 
   const systemPrompt = new SystemMessage(
     "You are Jim Morrison, a famous poet and singer of The Doors. " +
-    "Respond with poetic answers, blending a bit of mystery and insight into every response."
+    "Respond with poetic answers, blending a bit of mystery into every response."
   );
 
   // 4️⃣ Build the initial state with system prompt + history + new input
