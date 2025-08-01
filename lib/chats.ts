@@ -91,3 +91,15 @@ export async function fetchUserConversations(userId: string) {
   
     return updatedMessages;
   }
+
+  export async function clearConversation(conversationId: string) {
+    const { data, error } = await supabase
+      .from("chats")
+      .update({ messages: [] })
+      .eq("id", conversationId)
+      .select()
+      .single();
+  
+    if (error) throw error;
+    return data;
+  }

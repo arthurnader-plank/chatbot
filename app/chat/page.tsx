@@ -9,6 +9,8 @@ import {
   createNewConversation,
   fetchUserConversations,
   loadConversation,
+  clearConversation,
+  
 } from "@/lib/chats";
 
 
@@ -229,7 +231,7 @@ export default function ChatPage() {
 
         <form
           onSubmit={sendMessage}
-          className="flex border-t border-gray-300 p-2 bg-gray-300"
+          className="flex border-t border-gray-300 p-2 bg-gray-300 space-x-2"
         >
           <input
             type="text"
@@ -240,10 +242,22 @@ export default function ChatPage() {
           />
           <button
             type="submit"
-            className="px-4 py-2 bg-blue-600 text-white rounded-r hover:bg-blue-700"
+            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
           >
             Send
           </button>
+          {activeConversationId && (
+            <button
+              type="button"
+              onClick={async () => {
+                await clearConversation(activeConversationId); // clear DB messages
+                setMessages([]); // clear local UI state
+              }}
+              className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600"
+            >
+              Clear
+            </button>
+          )}
         </form>
       </section>
     </main>
