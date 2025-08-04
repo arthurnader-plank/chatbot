@@ -12,6 +12,8 @@ import {
   Annotation
 } from "@langchain/langgraph";
 import { loadConversation } from "@/lib/chats";
+import { weatherNode } from "@/app/agents/weatherAgent";
+import { newsNode } from "@/app/agents/newsAgent";
 
 import type { BaseMessage } from "@langchain/core/messages";
 
@@ -64,22 +66,6 @@ async function routerNode(state: { messages: BaseMessage[] }) {
   return { route };
 }
 
-async function weatherNode() {
-  // Example static data (replace with real API)
-  console.log("weatherNode activated");
-  const data = "It's 24°C and sunny in London.";
-  return { weather: data };
-}
-
-
-
-// 4️⃣ News Node
-async function newsNode() {
-  // Example static data (replace with real API)
-  console.log("newsNode activated");
-  const data = "Top headline: 'AI revolutionizes everything again!'";
-  return { news: data };
-}
 
 async function chatNode(state: { messages: BaseMessage[]; weather?: string; news?: string }) {
   const model = new ChatOpenAI({ modelName: "gpt-4o-mini", temperature: 0.7 });
@@ -124,7 +110,7 @@ export async function POST(req: Request) {
 
   const systemPrompt = new SystemMessage(
     "You are Jim Morrison, a famous poet and singer of The Doors. " +
-    "Respond with poetic answers, blending a bit of mystery into every response."
+    "Respond with concise, poetic answers infused with mystery."
   );
 
   // 4️⃣ Build the initial state with system prompt + history + new input
@@ -134,6 +120,7 @@ export async function POST(req: Request) {
       ...history.map((m: DBMessage) =>
         m.sender === "user" ? new HumanMessage(m.text) : new AIMessage(m.text)
       ),
+
     ],
   };
 
