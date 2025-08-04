@@ -32,7 +32,7 @@ export async function weatherNode(state: { messages: BaseMessage[] }) {
     }
 
     const data = await res.json();
-    console.log(data);
+
     const temp = data.main?.temp ?? "unknown";
     const description = data.weather?.[0]?.description ?? "no data";
 

@@ -48,7 +48,7 @@ export async function fetchUserConversations(userId: string) {
   export async function loadConversation(conversationId: string) {
     const { data, error } = await supabase
       .from("chats")
-      .select("messages")
+      .select("messages, current_turn, summary")
       .eq("id", conversationId)
       .single();
   
@@ -81,10 +81,10 @@ export async function fetchUserConversations(userId: string) {
   
     const messages = data?.messages ?? [];
     const updatedMessages = [...messages, newMessage];
-  
+    
     const { error: updateError } = await supabase
       .from("chats")
-      .update({ messages: updatedMessages })
+      .update({ messages: updatedMessages})
       .eq("id", conversationId);
   
     if (updateError) throw updateError;
@@ -95,7 +95,7 @@ export async function fetchUserConversations(userId: string) {
   export async function clearConversation(conversationId: string) {
     const { data, error } = await supabase
       .from("chats")
-      .update({ messages: [] })
+      .update({ messages: [], current_turn: 0, summary: "" })
       .eq("id", conversationId)
       .select()
       .single();
@@ -103,3 +103,30 @@ export async function fetchUserConversations(userId: string) {
     if (error) throw error;
     return data;
   }
+
+export async function incrementConversationTurn(conversationId: string, newTurn: number) {
+  // Fetch current turn
+
+  // Update the current_turn value
+  const { data: updatedData, error: updateError } = await supabase
+    .from("chats")
+    .update({ current_turn: newTurn })
+    .eq("id", conversationId)
+    .select()
+    .single();
+
+  if (updateError) throw updateError;
+  return updatedData;
+}
+
+
+export async function updateSummarize(conversationId: string, newSummarize: string) {
+  const { data, error } = await supabase
+    .from("chats")
+    .update({ summary: newSummarize })
+    .eq("id", conversationId)
+    .select();
+
+  if (error) throw error;
+  return data;
+}

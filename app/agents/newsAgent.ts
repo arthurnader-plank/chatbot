@@ -17,11 +17,9 @@ async function extractTopicWithLLM(query: string): Promise<string> {
 export async function newsNode(state: { messages: BaseMessage[] }) {
     const lastUserMessage = state.messages.findLast(m => m instanceof HumanMessage);
     const query = (lastUserMessage?.content as string) ?? "general news";
-    console.log(query);
 
     // 1️⃣ Extract topic using LLM
     const topic = await extractTopicWithLLM(query);
-    console.log(topic)
     // 2️⃣ Fetch from NewsAPI
     const url = `https://newsapi.org/v2/everything?q=${encodeURIComponent(
         topic
@@ -36,7 +34,7 @@ export async function newsNode(state: { messages: BaseMessage[] }) {
 
     const data = await response.json();
     const articles = (data.articles ?? []) as Array<{ title: string }>;
-    console.log(articles);
+
     if (articles.length === 0) {
         return { news: `No recent headlines found about ${topic}.` };
     }
@@ -44,8 +42,6 @@ export async function newsNode(state: { messages: BaseMessage[] }) {
     const headlines = articles
         .map((a, i) => `${i + 1}. ${a.title}`)
         .join("\n");
-
-    console.log(headlines)
 
     return { news: `Top headlines about ${topic}:\n${headlines}` };
 }

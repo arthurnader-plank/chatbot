@@ -1,18 +1,17 @@
 "use client";
 
-import { useEffect, useState } from "react";
+// React and Next.js libraries
+// Absolute imports from custom modules
 import { useRouter } from "next/navigation";
-
-import { supabase } from "@/lib/supabaseClient";
+import { useEffect, useState } from "react";
 import {
   appendMessageToConversation,
+  clearConversation,
   createNewConversation,
   fetchUserConversations,
   loadConversation,
-  clearConversation,
-  
 } from "@/lib/chats";
-
+import { supabase } from "@/lib/supabaseClient";
 
 interface DBMessage {
   id: number;
