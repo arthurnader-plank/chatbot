@@ -22,7 +22,7 @@ export default function SignupPage() {
   };
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-gray-100">
+    <main className="flex min-h-screen items-center justify-center bg-[url('/signup.webp')] bg-cover bg-gray-100 ">
       <div className="w-full max-w-md bg-white p-8 rounded-lg shadow text-black">
         <h1 className="text-2xl font-bold mb-6 text-center">Sign Up</h1>
         <form onSubmit={handleSignup} className="space-y-4">

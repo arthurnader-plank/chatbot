@@ -160,105 +160,119 @@ export default function ChatPage() {
   
 
   return (
-    <main className="flex min-h-screen">
-      <aside className="w-64 bg-gray-200 p-4 hidden md:flex flex-col">
-        <div className="flex space-x-2 mb-4">
-          <button
-            type="button"
-            onClick={newChat}
-            className="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-          >
-            + New Chat
-          </button>
-          <button
-            type="button"
-            onClick={handleLogout}
-            className="px-3 py-2 bg-red-400 text-white rounded hover:bg-red-700"
-          >
-            Logout
-          </button>
-        </div>
-        <h2 className="font-bold mb-4 text-black">Previous Chats</h2>
-        <div className="space-y-2">
-          {conversations.length > 0 ? (
-            conversations.map((conv) => (
-              <button
-                type="button"  
-                key={conv.id}
-                className={`p-2 rounded shadow text-black cursor-pointer transition 
-                  ${
-                    activeConversationId === conv.id
-                      ? "bg-blue-500 text-white" // highlight active conversation
-                      : "bg-white hover:bg-gray-100"
-                  }`}
-                onClick={() => handleLoadConversation(conv.id)}
-              >
-                {conv.title}
-              </button>
-            ))
-          ) : (
-            <p className="text-sm text-black">No previous conversations</p>
-          )}
-        </div>
-      </aside>
-
-      <section className="flex flex-1 flex-col">
-        <div className="flex-1 p-4 space-y-2 overflow-y-auto bg-gray-50">
-          {messages.map((msg) => (
-            <div
-              key={msg.id}
-              className={`flex ${
-                msg.sender === "user" ? "justify-end" : "justify-start"
-              }`}
-            >
-              <span
-                className={`px-4 py-2 rounded-lg ${
-                  msg.sender === "user"
-                    ? "bg-blue-200 text-black"
-                    : msg.route === "weather"
-                    ? "bg-orange-200 text-black"
-                    : msg.route === "news"
-                    ? "bg-green-200 text-black"
-                    : "bg-gray-300 text-black"
-                }`}
-              >
-                {msg.text}
-              </span>
-            </div>
-          ))}
-        </div>
-
-        <form
-          onSubmit={sendMessage}
-          className="flex border-t border-gray-300 p-2 bg-gray-300 space-x-2"
-        >
-          <input
-            type="text"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder="Type a message..."
-            className="flex-1 px-4 py-2 border rounded-l focus:outline-none focus:ring focus:ring-blue-300 text-black bg-blue-100"
-          />
-          <button
-            type="submit"
-            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-          >
-            Send
-          </button>
-          {activeConversationId && (
+    <main className="flex h-screen w-full bg-[#fff5f5] p-4">
+      <div className="flex flex-1 bg-[#fff5f5] rounded-lg shadow">
+        {/* Sidebar */}
+        <aside className="w-64 bg-[#450f01] p-4 hidden md:flex flex-col rounded-lg shadow h-full text-white">
+          <div className="flex space-x-2 mb-4">
             <button
               type="button"
-              onClick={async () => {
-                await clearConversation(activeConversationId); // clear DB messages
-                setMessages([]); // clear local UI state
-              }}
-              className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600"
+              onClick={newChat}
+              className="px-3 py-2 bg-[#9a3015] text-white rounded hover:bg-[#9a3015]"
             >
-              Clear
+              + New Chat
             </button>
-          )}
-        </form>
-      </section>
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="px-3 py-2 bg-[#fb0000] text-white rounded hover:bg-[#450f01]"
+            >
+              Logout
+            </button>
+          </div>
+
+          <h2 className="font-bold mb-4 text-white">Previous Chats</h2>
+
+          <div className="flex-1 overflow-y-auto space-y-2">
+            {conversations.length > 0 ? (
+              conversations.map((conv) => (
+                <button
+                  type="button"
+                  key={conv.id}
+                  className={`w-full max-w-[200px] truncate text-left p-2 rounded shadow cursor-pointer transition 
+                    ${
+                      activeConversationId === conv.id
+                        ? "bg-[#9a3015] text-white"
+                        : "bg-[#fff5f5] text-black hover:bg-[#82def9]"
+                    }`}
+                  onClick={() => handleLoadConversation(conv.id)}
+                >
+                  {conv.title}
+                </button>
+              ))
+            ) : (
+              <p className="text-sm text-white">No previous conversations</p>
+            )}
+          </div>
+        </aside>
+
+        {/* Chat Area */}
+        <section className="flex flex-1 flex-col ml-4 mr-4 rounded-lg border-2 border-[#9a3015] p-4 bg-[#fff5f5]">
+          <div
+            className="flex-1 p-4 space-y-2 overflow-y-auto"
+            style={{ maxHeight: "calc(100vh - 140px)" }}
+          >
+            {messages.map((msg) => (
+              <div
+                key={msg.id}
+                className={`mr-1 flex flex-col ${msg.sender === "user" ? "items-end" : "items-start"}`}
+              >
+                <span className="text-sm font-semibold mb-1">
+                  {msg.sender === "user" ? (
+                    <span className="text-[#9a3015]">You</span>
+                  ) : msg.route === "news" ? (
+                    <span className="text-blue-500">Yoda (from the news of R2-D2)</span>
+                  ) : msg.route === "weather" ? (
+                    <span className="text-green-600">Yoda (sensed by the Force)</span>
+                  ) : (
+                    <span className="text-[#9a3015]">Yoda</span>
+                  )}
+                </span>
+
+
+                <span
+                  className={`px-4 py-2 rounded-lg ${
+                    msg.sender === "user"
+                      ? "bg-[#82def9] text-black"
+                      : "bg-[#fff5f5] text-black border border-[#9a3015]"
+                  }`}
+                >
+                  {msg.text}
+                </span>
+              </div>
+            ))}
+          </div>
+
+          {/* Input */}
+          <form onSubmit={sendMessage} className="flex p-2 space-x-2 mt-4">
+            <input
+              type="text"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder="Type a message..."
+              className="flex-1 px-4 py-2 border border-[#9a3015] rounded-xl focus:outline-none focus:ring focus:ring-[#82def9] text-black"
+            />
+            <button
+              type="submit"
+              className="px-4 py-2 bg-[#9a3015] text-white rounded hover:bg-[#9a3015]"
+            >
+              Send
+            </button>
+            {activeConversationId && (
+              <button
+                type="button"
+                onClick={async () => {
+                  await clearConversation(activeConversationId);
+                  setMessages([]);
+                }}
+                className="px-4 py-2 bg-[#fb0000] text-white rounded hover:bg-[#450f01]"
+              >
+                Clear
+              </button>
+            )}
+          </form>
+        </section>
+      </div>
     </main>
   );
 }

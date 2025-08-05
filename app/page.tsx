@@ -2,11 +2,10 @@ import Link from "next/link";
 
 export default function HomePage() {
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center bg-gradient-to-br from-blue-500 to-indigo-600 text-white p-8">
-      <h1 className="text-4xl font-bold mb-4">Welcome to Chatbot</h1>
+    <main className="flex min-h-screen flex-col items-center justify-center bg-[url('/initial-page.avif')] bg-cover text-white p-8 pt-26">
+      <h1 className="text-4xl font-bold mb-4">Arrived, you have, young Padawan</h1>
       <p className="text-lg text-center max-w-md mb-8">
-        This is your friendly chatbot project built with Next.js, Tailwind CSS, and React.
-        Use the login page to access your account and start chatting!
+        Use the login page, you must, to begin your training.
       </p>
       <div className="flex space-x-4">
         <Link

@@ -23,7 +23,7 @@ export default function LoginPage() {
   };
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-gray-100">
+    <main className="flex min-h-screen items-center justify-center bg-[url('/login.jpg')] bg-cover bg-center">
       <div className="w-full max-w-md bg-white p-8 rounded-lg shadow text-black">
         <h1 className="text-2xl font-bold mb-6 text-center">Login</h1>
         <form onSubmit={handleLogin} className="space-y-4">
