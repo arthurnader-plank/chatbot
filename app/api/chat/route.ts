@@ -11,7 +11,7 @@ import {
   END,
   Annotation
 } from "@langchain/langgraph";
-import { incrementConversationTurn, loadConversation, updateSummarize } from "@/lib/chats";
+import { incrementConversationTurn, loadConversation, updateConversationTitle, updateSummarize} from "@/lib/chats";
 import { weatherNode } from "@/app/agents/weatherAgent";
 import { newsNode } from "@/app/agents/newsAgent";
 import { summarizerNode } from "@/app/agents/summarizerAgent";
@@ -49,6 +49,10 @@ const StateAnnotation = Annotation.Root({
     value: (_existing, update) => update,
     default: () => "",
   }),
+  title: Annotation<string>({
+    value: (_existing, update) => update,
+    default: () => "",
+  }),
   turn: Annotation<number>({
     value: (_existing, update) => update,
     default: () => 0,
@@ -75,6 +79,23 @@ async function routerNode(state: { messages: BaseMessage[] }) {
   return { route };
 }
 
+async function titleAgent(state: { messages: BaseMessage[]}) {
+  console.log("ITS TITLE TIME");
+  const model = new ChatOpenAI({ modelName: "gpt-4o-mini", temperature: 0 });
+  const lastUserMessage = state.messages.findLast(m => m instanceof HumanMessage);
+  console.log(lastUserMessage?.content);
+
+  const prompt = [
+    new SystemMessage(
+      "Generate a title with maximum of four words based on the user message."
+    ),
+    new HumanMessage(`${lastUserMessage?.content}`)
+  ];
+
+  const response = await model.invoke(prompt);
+  return {title: String(response.content).trim()};
+}
+
 
 async function chatNode(state: { messages: BaseMessage[]; weather?: string; news?: string }) {
   const model = new ChatOpenAI({ modelName: "gpt-4o-mini", temperature: 0.7 });
@@ -94,18 +115,26 @@ async function chatNode(state: { messages: BaseMessage[]; weather?: string; news
 
 // 3️⃣ Build the graph
 // 6️⃣ Graph definition
-const graph = new StateGraph(StateAnnotation) // Defines the entry point
+const graph = new StateGraph(StateAnnotation)
+  .addNode("titleAgent", titleAgent) // Defines the entry point
   .addNode("router", routerNode)
   .addNode("weatherNode", weatherNode)
   .addNode("newsNode", newsNode)
   .addNode("chat", chatNode)
   .addNode("summarizer", summarizerNode)
-  .addEdge(START, "router")
+  .addConditionalEdges(START, (state) => {
+    // If it's the first user turn, run titleAgent
+    return state.turn === 1 ? "titleAgent" : "router";
+  }, {
+    titleAgent: "titleAgent",
+    router: "router"
+  })
   .addConditionalEdges("router", (state) => state.route, {
     weather: "weatherNode",
     news: "newsNode",
     chat: "chat"
   })
+  .addEdge("titleAgent", "router")
   .addEdge("weatherNode", "chat")
   .addEdge("newsNode", "chat")
   .addConditionalEdges("chat", (state) => {
@@ -173,6 +202,9 @@ export async function POST(req: Request) {
 
   if (currentTurn >= 10 && currentTurn % 5 === 0)
     await updateSummarize(conversationId, result.summary)
+  console.log(result.title)
+  if (currentTurn === 1)
+    await updateConversationTitle(conversationId, result.title)
 
-  return NextResponse.json({ output: last.content, route:result.route });
+  return NextResponse.json({ output: last.content, route:result.route, title:result.title});
 }

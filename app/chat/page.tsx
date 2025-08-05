@@ -101,6 +101,15 @@ export default function ChatPage() {
         }),
       }).then((res) => res.json());
   
+      // If response has title -> update state
+      if (response.title && activeConversationId) {
+        setConversations((prev) =>
+          prev.map((conv) =>
+            conv.id === activeConversationId ? { ...conv, title: response.title } : conv
+          )
+        );
+      }
+
       if (response.error) {
         console.error("Chat error:", response.error);
         return;
@@ -168,7 +177,7 @@ export default function ChatPage() {
             <button
               type="button"
               onClick={newChat}
-              className="px-3 py-2 bg-[#9a3015] text-white rounded hover:bg-[#9a3015]"
+              className="px-3 py-2 bg-blue-500 text-white rounded hover:bg-[#9a3015]"
             >
               + New Chat
             </button>
@@ -193,7 +202,7 @@ export default function ChatPage() {
                     ${
                       activeConversationId === conv.id
                         ? "bg-[#9a3015] text-white"
-                        : "bg-[#fff5f5] text-black hover:bg-[#82def9]"
+                        : "bg-[#fff5f5] text-black hover:bg-[#9a3015] hover:text-white"
                     }`}
                   onClick={() => handleLoadConversation(conv.id)}
                 >
@@ -244,7 +253,7 @@ export default function ChatPage() {
           </div>
 
           {/* Input */}
-          <form onSubmit={sendMessage} className="flex p-2 space-x-2 mt-4">
+          <form onSubmit={sendMessage} className="flex p-2 space-x-2 m-4">
             <input
               type="text"
               value={input}
@@ -254,7 +263,7 @@ export default function ChatPage() {
             />
             <button
               type="submit"
-              className="px-4 py-2 bg-[#9a3015] text-white rounded hover:bg-[#9a3015]"
+              className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-[#9a3015]"
             >
               Send
             </button>

@@ -34,7 +34,7 @@ export async function fetchUserConversations(userId: string) {
 
   export async function updateConversationTitle(conversationId: string, title: string) {
     const { data, error } = await supabase
-      .from("conversations")
+      .from("chats")
       .update({ title })
       .eq("id", conversationId)
       .select()
