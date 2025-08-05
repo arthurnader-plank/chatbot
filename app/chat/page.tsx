@@ -3,7 +3,7 @@
 // React and Next.js libraries
 // Absolute imports from custom modules
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import {
   appendMessageToConversation,
   clearConversation,
@@ -33,6 +33,15 @@ export default function ChatPage() {
   const [messages, setMessages] = useState<DBMessage[]>([]);
   const [input, setInput] = useState("");
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const [initialLoad, setInitialLoad] = useState(true);
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: messages dependency is needed for scroll behavior
+  useEffect(() => {
+    if (!initialLoad && messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [messages]); 
 
   // Check authentication on component mount
   useEffect(() => {
@@ -75,6 +84,7 @@ export default function ChatPage() {
     await supabase.auth.signOut();
     window.location.href = "/";
   };
+  
 
 
   const sendMessage = async (e: React.FormEvent) => {
@@ -155,6 +165,7 @@ export default function ChatPage() {
   }
 
   const handleLoadConversation = async (conversationId: string) => {
+    setInitialLoad(true);
     setActiveConversationId(conversationId);
     const conversation = await loadConversation(conversationId);
     setMessages(
@@ -165,6 +176,7 @@ export default function ChatPage() {
         route: m.route,
       }))
     );
+    setTimeout(() => setInitialLoad(false), 0);
   };
   
 
@@ -250,6 +262,7 @@ export default function ChatPage() {
                 </span>
               </div>
             ))}
+            <div ref={messagesEndRef}></div>
           </div>
 
           {/* Input */}
