@@ -134,7 +134,7 @@ export async function POST(req: Request) {
     "Respond with concise, poetic answers infused with mystery."
   );
 
-  const numMessages = 5 + Math.floor(currentTurn % 5);
+  const numMessages = 6 + (currentTurn - 1) % 5
   
   const selectedMessages: DBMessage[] = [];
   let userCount = 0;

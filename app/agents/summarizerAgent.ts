@@ -5,45 +5,35 @@ import { ChatOpenAI } from "@langchain/openai";
 const model = new ChatOpenAI({ modelName: "gpt-4o-mini", temperature: 0 });
 
 export async function summarizerNode(state: { messages: BaseMessage[]; summary: string }) {
-    console.log("SUMMARIZER IS RUNNING")
-  // Walk backwards and collect messages until we have seen 10 HumanMessages
+
+    // Select all conversation until (but not including) the 6th HumanMessage
     let humanCount = 0;
-    const selectedMessages: BaseMessage[] = [];
+    const messagesToSummarize: BaseMessage[] = [];
 
-    for (let i = state.messages.length - 1; i >= 0; i--) {
-    const msg = state.messages[i];
-    selectedMessages.unshift(msg); // keep order
-
-    if (msg instanceof HumanMessage) {
-        humanCount++;
-        if (humanCount === 10) break; // stop AFTER including the 10th human message
-    }
-    }
-
-    let selectedCount = 0;
-    const messagesUntilSixthHuman: BaseMessage[] = [];
-    
-    for (const msg of selectedMessages) {
+    for (const msg of state.messages) {
         if (msg instanceof HumanMessage) {
-            selectedCount++;
-        if (selectedCount === 6) break; // stop after the 6th HumanMessage
+            humanCount++;
+            if (humanCount === 6) break; // stop BEFORE including this one
         }
-        messagesUntilSixthHuman.push(msg);
+        messagesToSummarize.push(msg);
     }
-    
-    const toSummarize = messagesUntilSixthHuman
+
+    const toSummarize = messagesToSummarize
         .map((m) => {
-        const role = m instanceof HumanMessage ? "Human" : m instanceof AIMessage ? "AI" : "Other";
-        return `${role}: ${m.content}`;
+            const role = m instanceof HumanMessage ? "Human" : m instanceof AIMessage ? "AI" : "Other";
+            return `${role}: ${m.content}`;
         })
         .join("\n");
 
+    console.log(toSummarize);
+
     const prompt = [
-    new SystemMessage(
-        "Summarize the following conversation segment, focusing on key facts and user intent. If a previous summary is provided, integrate it seamlessly into a single concise summary. Keep the final summary short and focused." 
-    ),
-    new HumanMessage(`Previous summary: ${state.summary || "(none)"}`),
-    new HumanMessage(`Conversation segment:\n${toSummarize}`),
+        new SystemMessage(
+            "Summarize the following conversation segment, focusing on key facts and user intent. "
+            + "If a previous summary is provided, integrate it seamlessly into a single concise summary. "
+        ),
+        new HumanMessage(`Previous summary: ${state.summary || "(none)"}`),
+        new HumanMessage(`Conversation segment:\n${toSummarize}`),
     ];
 
     const response = await model.invoke(prompt);
