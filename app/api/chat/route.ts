@@ -80,7 +80,7 @@ async function routerNode(state: { messages: BaseMessage[] }) {
 }
 
 async function titleAgent(state: { messages: BaseMessage[]}) {
-  og("ITS TITLE TIME");
+ 
   const model = new ChatOpenAI({ modelName: "gpt-4o-mini", temperature: 0 });
   const lastUserMessage = state.messages.findLast(m => m instanceof HumanMessage);
 
