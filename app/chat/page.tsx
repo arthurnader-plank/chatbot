@@ -36,6 +36,8 @@ function LoadingDots() {
   );
 }
 
+
+
 export default function ChatPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
@@ -45,7 +47,39 @@ export default function ChatPage() {
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const [loadingMessage, setLoadingMessage] = useState(false);
+  const [recording, setRecording] = useState(false);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
 
+  async function toggleRecording() {
+    if (!recording) {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+  
+      audioChunksRef.current = [];
+      mediaRecorder.ondataavailable = (event) => audioChunksRef.current.push(event.data);
+  
+      mediaRecorder.onstop = async () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: "audio/webm" });
+        const formData = new FormData();
+        formData.append("file", audioBlob, "recording.webm");
+  
+        const res = await fetch("/api/transcribe", {
+          method: "POST",
+          body: formData,
+        });
+        const data = await res.json();
+        setInput(data.text); // fill input with transcription
+      };
+  
+      mediaRecorder.start();
+      setRecording(true);
+    } else {
+      mediaRecorderRef.current?.stop();
+      setRecording(false);
+    }
+  }
   
   // biome-ignore lint/correctness/useExhaustiveDependencies: messages dependency is needed for scroll behavior
   useEffect(() => {
@@ -294,8 +328,15 @@ export default function ChatPage() {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               placeholder="Type a message..."
-              className="flex-1 px-4 py-2 border border-[#9a3015] rounded-xl focus:outline-none focus:ring focus:ring-[#82def9] text-black"
+              className="flex-1 px-4 py-2 border border-[#9a3015] rounded-xl focus:outline-none focus:ring focus:ring-[#9a3015] text-black"
             />
+            <button
+              type="button"
+              onClick={toggleRecording}
+              className={`px-4 py-2 rounded ${recording ? "bg-red-300 animate-pulse" : "bg-green-800"} text-white`}
+            >
+              {recording ? "Stop" : "Rec"}
+            </button>
             <button
               type="submit"
               className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-[#9a3015]"
