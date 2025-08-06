@@ -25,8 +25,6 @@ export async function summarizerNode(state: { messages: BaseMessage[]; summary: 
         })
         .join("\n");
 
-    console.log(toSummarize);
-
     const prompt = [
         new SystemMessage(
             "Summarize the following conversation segment, focusing on key facts and user intent. "

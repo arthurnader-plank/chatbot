@@ -302,7 +302,7 @@ export default function ChatPage() {
                 <span
                   className={`px-4 py-2 rounded-lg ${
                     msg.sender === "user"
-                      ? "bg-[#fff5f5] text-black border border-[#82def9]"
+                      ? "bg-[#fff5f5] text-black border border-blue-500"
                       : "bg-[#fff5f5] text-black border border-[#9a3015]"
                   }`}
                 >

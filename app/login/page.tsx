@@ -18,14 +18,20 @@ export default function LoginPage() {
     if (error) {
       alert(`Login failed: ${error.message}`);
     } else {
-      window.location.href = "/chat";
+      const audio = new Audio("/login.mp3");
+      console.log(audio);
+      audio.volume = 0.35;
+      audio.play();
+      setTimeout(() => {
+        window.location.href = "/chat";
+      }, 2500); // Play the sound
     }
   };
-
   return (
     <main className="flex min-h-screen items-center justify-center bg-[url('/login.jpg')] bg-cover bg-center">
       <div className="w-full max-w-md bg-white p-8 rounded-lg shadow text-black">
-        <h1 className="text-2xl font-bold mb-6 text-center">Login</h1>
+    
+    <h1 className="text-2xl font-bold mb-6 text-center">Login</h1>
         <form onSubmit={handleLogin} className="space-y-4">
           <div>
             <label htmlFor="email" className="block text-sm font-medium mb-1">

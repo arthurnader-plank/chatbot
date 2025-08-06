@@ -75,15 +75,14 @@ async function routerNode(state: { messages: BaseMessage[] }) {
 
   const response = await routerModel.invoke([system, lastUserMessage]);
   const route = String(response.content).trim().toLowerCase();
-  console.log(route);
+
   return { route };
 }
 
 async function titleAgent(state: { messages: BaseMessage[]}) {
-  console.log("ITS TITLE TIME");
+  og("ITS TITLE TIME");
   const model = new ChatOpenAI({ modelName: "gpt-4o-mini", temperature: 0 });
   const lastUserMessage = state.messages.findLast(m => m instanceof HumanMessage);
-  console.log(lastUserMessage?.content);
 
   const prompt = [
     new SystemMessage(
@@ -101,13 +100,10 @@ async function chatNode(state: { messages: BaseMessage[]; weather?: string; news
   const model = new ChatOpenAI({ modelName: "gpt-4o-mini", temperature: 0.7 });
 
   const contextMessages: BaseMessage[] = [];
-  console.log(state.weather);
+
   if (state.weather) contextMessages.push(new AIMessage(`Weather info: ${state.weather}`));
   if (state.news) contextMessages.push(new AIMessage(`News info: ${state.news}`));
-console.log([
-  ...state.messages,
-  ...contextMessages
-]);
+
   const response = await model.invoke([
     ...state.messages,
     ...contextMessages
@@ -188,14 +184,6 @@ export async function POST(req: Request) {
     m.sender === "user" ? new HumanMessage(m.text) : new AIMessage(m.text)
   );
 
-  console.log([
-    systemPrompt,
-    ...(conversationSummary
-      ? [new AIMessage(`Summary of past conversation: ${conversationSummary}`)]
-      : []),
-    ...recentMessages,
-  ])
-
   const initState = {
     messages: [
       systemPrompt,
@@ -214,7 +202,7 @@ export async function POST(req: Request) {
 
   if (currentTurn >= 10 && currentTurn % 5 === 0)
     await updateSummarize(conversationId, result.summary)
-  console.log(result.title)
+
   if (currentTurn === 1)
     await updateConversationTitle(conversationId, result.title)
 
