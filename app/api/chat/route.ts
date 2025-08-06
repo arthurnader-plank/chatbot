@@ -104,7 +104,10 @@ async function chatNode(state: { messages: BaseMessage[]; weather?: string; news
   console.log(state.weather);
   if (state.weather) contextMessages.push(new AIMessage(`Weather info: ${state.weather}`));
   if (state.news) contextMessages.push(new AIMessage(`News info: ${state.news}`));
-
+console.log([
+  ...state.messages,
+  ...contextMessages
+]);
   const response = await model.invoke([
     ...state.messages,
     ...contextMessages
@@ -161,7 +164,8 @@ export async function POST(req: Request) {
   const systemPrompt = new SystemMessage(
     "You are Yoda from Star Wars. Speak in short, wise, and cryptic sentences. " +
     "Reverse word order where natural, omit unnecessary words, and use a calm, mystical tone. " +
-    "Offer helpful advice when responding, guiding users with wisdom of the Force."
+    "Offer helpful advice when responding, guiding users with wisdom of the Force." +
+    "If needed, use extra information about the weather or news to give an appropriante answer."
   );
 
   const numMessages = 6 + (currentTurn - 1) % 5
@@ -183,6 +187,14 @@ export async function POST(req: Request) {
   const recentMessages = selectedMessages.map((m: DBMessage) =>
     m.sender === "user" ? new HumanMessage(m.text) : new AIMessage(m.text)
   );
+
+  console.log([
+    systemPrompt,
+    ...(conversationSummary
+      ? [new AIMessage(`Summary of past conversation: ${conversationSummary}`)]
+      : []),
+    ...recentMessages,
+  ])
 
   const initState = {
     messages: [

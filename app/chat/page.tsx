@@ -26,6 +26,16 @@ interface Conversation {
     created_at: string;
   }
 
+function LoadingDots() {
+  return (
+    <span className="inline-flex ml-2">
+      <span className="dot animate-bounce delay-0">.</span>
+      <span className="dot animate-bounce delay-150">.</span>
+      <span className="dot animate-bounce delay-300">.</span>
+    </span>
+  );
+}
+
 export default function ChatPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
@@ -34,11 +44,12 @@ export default function ChatPage() {
   const [input, setInput] = useState("");
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
-  const [initialLoad, setInitialLoad] = useState(true);
+  const [loadingMessage, setLoadingMessage] = useState(false);
 
+  
   // biome-ignore lint/correctness/useExhaustiveDependencies: messages dependency is needed for scroll behavior
   useEffect(() => {
-    if (!initialLoad && messagesEndRef.current) {
+    if (messagesEndRef.current) {
       messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
     }
   }, [messages]); 
@@ -94,6 +105,9 @@ export default function ChatPage() {
     // --- 1. Add user message to UI and DB ---
     const userMessage = { id: Date.now(), sender: "user", text: input.trim() };
     setMessages((prev) => [...prev, userMessage]);
+
+    setLoadingMessage(true);
+
     await appendMessageToConversation(activeConversationId, {
       sender: "user",
       text: input.trim(),
@@ -125,6 +139,8 @@ export default function ChatPage() {
         return;
       }
   
+      setLoadingMessage(false);
+
       // --- 3. Add bot message to UI and DB ---
       const botMessage = { id: Date.now() + 1, sender: "bot", text: response.output, route: response.route };
       setMessages((prev) => [...prev, botMessage]);
@@ -165,7 +181,6 @@ export default function ChatPage() {
   }
 
   const handleLoadConversation = async (conversationId: string) => {
-    setInitialLoad(true);
     setActiveConversationId(conversationId);
     const conversation = await loadConversation(conversationId);
     setMessages(
@@ -176,7 +191,6 @@ export default function ChatPage() {
         route: m.route,
       }))
     );
-    setTimeout(() => setInitialLoad(false), 0);
   };
   
 
@@ -254,7 +268,7 @@ export default function ChatPage() {
                 <span
                   className={`px-4 py-2 rounded-lg ${
                     msg.sender === "user"
-                      ? "bg-[#82def9] text-black"
+                      ? "bg-[#fff5f5] text-black border border-[#82def9]"
                       : "bg-[#fff5f5] text-black border border-[#9a3015]"
                   }`}
                 >
@@ -262,6 +276,14 @@ export default function ChatPage() {
                 </span>
               </div>
             ))}
+            {loadingMessage&& (
+              <div className="flex flex-col items-start">
+                <span className="px-4 py-2 rounded-lg bg-[#fff5f5] text-black border border-[#9a3015] italic">
+                  R2-D2 is sending message to Dagobah
+                  <LoadingDots />
+                </span>
+              </div>
+            )} 
             <div ref={messagesEndRef}></div>
           </div>
 
