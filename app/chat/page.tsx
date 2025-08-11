@@ -211,7 +211,13 @@ export default function ChatPage() {
   };
 
   if (loading) {
-    return <p className="text-center mt-10">Checking authentication...</p>;
+    return (
+      <div className="fixed top-4 left-0 w-full flex justify-center z-50">
+        <p className="text-white text-sm font-semibold tracking-wider animate-pulse">
+          Checking your Jedi credentials...
+        </p>
+      </div>
+    );
   }
 
   const handleLoadConversation = async (conversationId: string) => {

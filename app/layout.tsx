@@ -4,8 +4,11 @@ import "./globals.css";
 const merriweather = Merriweather({ subsets: ["latin"], weight: ["400", "700"] });
 
 export const metadata = {
-  title: "Chatbot",
+  title: "Yoda chatbot",
   description: "A simple chatbot built with Next.js and Tailwind CSS",
+  icons: {
+    icon: "/jedi.ico", // put favicon.ico inside public/
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
