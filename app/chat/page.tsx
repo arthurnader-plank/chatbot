@@ -1,9 +1,8 @@
 "use client";
 
-// React and Next.js libraries
-// Absolute imports from custom modules
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useRef } from "react";
+import { useChat } from "@ai-sdk/react";
 import {
   appendMessageToConversation,
   clearConversation,
@@ -15,16 +14,16 @@ import { supabase } from "@/lib/supabaseClient";
 
 interface DBMessage {
   id: number;
-  sender: string;
+  sender: "user" | "assistant";
   text: string;
   route?: string;
 }
 
 interface Conversation {
-    id: string;
-    title: string;
-    created_at: string;
-  }
+  id: string;
+  title: string;
+  created_at: string;
+}
 
 function LoadingDots() {
   return (
@@ -36,59 +35,127 @@ function LoadingDots() {
   );
 }
 
+/**
+ * Parse message.content that may be:
+ *  - a plain string
+ *  - a JSON string like {"output":"...","route":"news","title":""}
+ *  - an object in that same shape
+ *  - an array of parts from the AI SDK
+ */
+type AssistantJSON = {
+  output?: string;
+  route?: string;
+  title?: string;
+};
 
+function isAssistantJSON(value: unknown): value is AssistantJSON {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    ("output" in value || "route" in value || "title" in value)
+  );
+}
+
+export function parseAssistantContent(content: unknown): { text: string; route?: string } {
+  if (typeof content === "string") {
+    try {
+      const parsed = JSON.parse(content) as unknown;
+      if (isAssistantJSON(parsed)) {
+        return { text: String(parsed.output ?? ""), route: parsed.route };
+      }
+      return { text: content };
+    } catch {
+      return { text: content };
+    }
+  }
+
+  if (isAssistantJSON(content)) {
+    return { text: String(content.output ?? ""), route: content.route };
+  }
+
+  if (Array.isArray(content)) {
+    const text = content
+      .map((p) => {
+        if (p && typeof p === "object" && "type" in p && (p as { type?: string }).type === "text") {
+          return (p as { text?: string }).text ?? "";
+        }
+        return "";
+      })
+      .join("");
+    return { text };
+  }
+
+  return { text: "" };
+}
+
+function normalizeMessages(msgs: Partial<DBMessage>[]): DBMessage[] {
+  return (msgs || []).map((m, idx) => ({
+    id: typeof m.id === "number" ? m.id : idx + 1,
+    sender: (m.sender as DBMessage["sender"]) ?? "assistant",
+    text: m.text ?? "",
+    route: m.route,
+  }));
+}
 
 export default function ChatPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [messages, setMessages] = useState<DBMessage[]>([]);
-  const [input, setInput] = useState("");
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
+
+  const [dbMessages, setDbMessages] = useState<DBMessage[]>([]);
+
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
-  const [loadingMessage, setLoadingMessage] = useState(false);
   const [recording, setRecording] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
 
-  async function toggleRecording() {
-    if (!recording) {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream);
-      mediaRecorderRef.current = mediaRecorder;
-  
-      audioChunksRef.current = [];
-      mediaRecorder.ondataavailable = (event) => audioChunksRef.current.push(event.data);
-  
-      mediaRecorder.onstop = async () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: "audio/webm" });
-        const formData = new FormData();
-        formData.append("file", audioBlob, "recording.webm");
-  
-        const res = await fetch("/api/transcribe", {
-          method: "POST",
-          body: formData,
-        });
-        const data = await res.json();
-        setInput(data.text); // fill input with transcription
-      };
-  
-      mediaRecorder.start();
-      setRecording(true);
-    } else {
-      mediaRecorderRef.current?.stop();
-      setRecording(false);
-    }
-  }
-  
+  const { input, setInput, append, isLoading } = useChat({
+    api: "/api/chat",
+    body: { conversationId: activeConversationId },
+    streamProtocol: "text",
+    onResponse: async (res) => {
+      if (!res.ok) console.error("Chat error", await res.text());
+    },
+    // Append assistant reply into dbMessages AND persist it to Supabase
+    onFinish: async (message) => {
+      try {
+        const { text, route } = parseAssistantContent(message.content);
+        // 1) Persist bot message to DB
+        if (activeConversationId) {
+          await appendMessageToConversation(activeConversationId, {
+            sender: "assistant",
+            text,
+            route: route ?? "chat",
+          });
+        }
+
+        // 2) Update UI (optimistic/local)
+        setDbMessages((prev) => [
+          ...prev,
+          { id: Date.now(), sender: "assistant", text, route },
+        ]);
+
+        // 3) Refresh sidebar titles
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const convs = await fetchUserConversations(user.id);
+          setConversations(convs ?? []);
+        }
+      } catch (err) {
+        console.error("Failed to persist assistant message:", err);
+      } finally {
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+      }
+    },
+  });
+
   // biome-ignore lint/correctness/useExhaustiveDependencies: messages dependency is needed for scroll behavior
   useEffect(() => {
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
-    }
-  }, [messages]); 
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [dbMessages]);
 
-  // Check authentication on component mount
+  // auth check
   useEffect(() => {
     const checkAuth = async () => {
       const { data } = await supabase.auth.getSession();
@@ -101,93 +168,53 @@ export default function ChatPage() {
     checkAuth();
   }, [router]);
 
+  // load conversations list
   useEffect(() => {
     const fetchConversationsList = async () => {
       const { data: { user } } = await supabase.auth.getUser();
-
-      if (!user) {
-        console.log("No user logged in");
-        return;
-      }
-      
-      console.log(user.id);
       if (!user) return;
 
       try {
         const conversations = await fetchUserConversations(user.id);
-        setConversations(conversations?? []);
+        setConversations(conversations ?? []);
       } catch (error) {
         console.error("Error fetching conversations:", error);
       }
     };
-
     if (!loading) fetchConversationsList();
   }, [loading]);
-
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
     window.location.href = "/";
   };
-  
 
+  async function toggleRecording() {
+    if (!recording) {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
 
-  const sendMessage = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!input.trim() || !activeConversationId) return;
-  
-    // --- 1. Add user message to UI and DB ---
-    const userMessage = { id: Date.now(), sender: "user", text: input.trim() };
-    setMessages((prev) => [...prev, userMessage]);
+      audioChunksRef.current = [];
+      mediaRecorder.ondataavailable = (event) => audioChunksRef.current.push(event.data);
 
-    setLoadingMessage(true);
+      mediaRecorder.onstop = async () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: "audio/webm" });
+        const formData = new FormData();
+        formData.append("file", audioBlob, "recording.webm");
 
-    await appendMessageToConversation(activeConversationId, {
-      sender: "user",
-      text: input.trim(),
-    });
-  
-    setInput("");
-  
-    try {
-      // --- 2. Call server API route ---
-      const response = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          conversationId: activeConversationId,
-        }),
-      }).then((res) => res.json());
-  
-      // If response has title -> update state
-      if (response.title && activeConversationId) {
-        setConversations((prev) =>
-          prev.map((conv) =>
-            conv.id === activeConversationId ? { ...conv, title: response.title } : conv
-          )
-        );
-      }
+        const res = await fetch("/api/transcribe", { method: "POST", body: formData });
+        const data = await res.json();
+        setInput(data.text);
+      };
 
-      if (response.error) {
-        console.error("Chat error:", response.error);
-        return;
-      }
-  
-      setLoadingMessage(false);
-
-      // --- 3. Add bot message to UI and DB ---
-      const botMessage = { id: Date.now() + 1, sender: "bot", text: response.output, route: response.route };
-      setMessages((prev) => [...prev, botMessage]);
-      await appendMessageToConversation(activeConversationId, {
-        sender: "bot",
-        text: response.output,
-        route: response.route,
-      });
-    } catch (error) {
-      console.error("Error sending message:", error);
+      mediaRecorder.start();
+      setRecording(true);
+    } else {
+      mediaRecorderRef.current?.stop();
+      setRecording(false);
     }
-  };
-  
+  }
 
   const newChat = async () => {
     try {
@@ -197,17 +224,45 @@ export default function ChatPage() {
         return;
       }
       const conversation = await createNewConversation(user.id);
-      console.log("New conversation created:", conversation);
-
-      // Update sidebar conversations list
       setConversations((prev) => [conversation, ...prev]);
       setActiveConversationId(conversation.id);
-  
-      // Reset local chat messages for this conversation
-      setMessages([]);
+      setDbMessages([]);
     } catch (error) {
       console.error("Error creating conversation:", error);
     }
+  };
+
+  const handleLoadConversation = async (conversationId: string) => {
+    setActiveConversationId(conversationId);
+    const conversation = await loadConversation(conversationId);
+    setDbMessages(normalizeMessages(conversation.messages || []));
+  };
+
+  const onSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!input.trim() || !activeConversationId) return;
+
+    const text = input.trim();
+
+    // optimistic user message in UI
+    const userMessage: DBMessage = {
+      id: Date.now(),
+      sender: "user",
+      text,
+    };
+    setDbMessages((prev) => [...prev, userMessage]);
+
+    // persist user message
+    try {
+      await appendMessageToConversation(activeConversationId, { sender: "user", text });
+    } catch (err) {
+      console.error("Failed to persist user message:", err);
+    }
+
+    // stream assistant reply (server may also persist; we persist again above for safety)
+    await append({ role: "user", content: text }, { body: { conversationId: activeConversationId } });
+
+    setInput("");
   };
 
   if (loading) {
@@ -219,20 +274,6 @@ export default function ChatPage() {
       </div>
     );
   }
-
-  const handleLoadConversation = async (conversationId: string) => {
-    setActiveConversationId(conversationId);
-    const conversation = await loadConversation(conversationId);
-    setMessages(
-      (conversation.messages || []).map((m: DBMessage, i: number) => ({
-        id: i,
-        sender: m.sender,
-        text: m.text,
-        route: m.route,
-      }))
-    );
-  };
-  
 
   return (
     <main className="flex h-screen w-full bg-[#fff5f5] p-4">
@@ -287,9 +328,9 @@ export default function ChatPage() {
             className="flex-1 p-4 space-y-2 overflow-y-auto"
             style={{ maxHeight: "calc(100vh - 140px)" }}
           >
-            {messages.map((msg) => (
+            {dbMessages.map((msg, idx) => (
               <div
-                key={msg.id}
+                key={msg.id ?? `${msg.sender}-${idx}`}
                 className={`mr-1 flex flex-col ${msg.sender === "user" ? "items-end" : "items-start"}`}
               >
                 <span className="text-sm font-semibold mb-1">
@@ -303,8 +344,6 @@ export default function ChatPage() {
                     <span className="text-[#9a3015]">Yoda</span>
                   )}
                 </span>
-
-
                 <span
                   className={`px-4 py-2 rounded-lg ${
                     msg.sender === "user"
@@ -316,19 +355,21 @@ export default function ChatPage() {
                 </span>
               </div>
             ))}
-            {loadingMessage&& (
+
+            {isLoading && (
               <div className="flex flex-col items-start">
                 <span className="px-4 py-2 rounded-lg bg-[#fff5f5] text-black border border-[#9a3015] italic">
                   R2-D2 is sending message to Dagobah
                   <LoadingDots />
                 </span>
               </div>
-            )} 
-            <div ref={messagesEndRef}></div>
+            )}
+
+            <div ref={messagesEndRef} />
           </div>
 
           {/* Input */}
-          <form onSubmit={sendMessage} className="flex p-2 space-x-2 m-4">
+          <form onSubmit={onSubmit} className="flex p-2 space-x-2 m-4">
             <input
               type="text"
               value={input}
@@ -354,7 +395,7 @@ export default function ChatPage() {
                 type="button"
                 onClick={async () => {
                   await clearConversation(activeConversationId);
-                  setMessages([]);
+                  setDbMessages([]);
                 }}
                 className="px-4 py-2 bg-[#fb0000] text-white rounded hover:bg-[#450f01]"
               >

@@ -9,13 +9,14 @@
     "lint": "next lint"
   },
   "dependencies": {
-    "@ai-sdk/react": "^2.0.4",
+    "@ai-sdk/langchain": "^1.0.4",
+    "@ai-sdk/react": "1.2.12",
     "@langchain/core": "^0.3.66",
     "@langchain/langgraph": "^0.4.0",
     "@langchain/openai": "^0.6.3",
     "@supabase/ssr": "^0.6.1",
     "@supabase/supabase-js": "^2.53.0",
-    "ai": "^5.0.4",
+    "ai": "^4.3.19",
     "langchain": "^0.3.30",
     "langsmith": "^0.3.50",
     "next": "15.4.5",
