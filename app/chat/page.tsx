@@ -99,6 +99,7 @@ export default function ChatPage() {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [dbMessages, setDbMessages] = useState<DBMessage[]>([]);
+  const [confirmClearOpen, setConfirmClearOpen] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const [recording, setRecording] = useState(false);
@@ -332,6 +333,37 @@ export default function ChatPage() {
           </div>
         </aside>
 
+        {confirmClearOpen && (
+          <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
+            <div className="bg-white p-6 rounded-lg shadow-lg max-w-sm w-full">
+              <h2 className="text-lg text-black font-semibold mb-4">Are you sure?</h2>
+              <p className="mb-6 text-black">Clear the conversation, you will. Certain, are you?</p>
+              <div className="flex justify-end space-x-2">
+                <button
+                  type = "button"
+                  onClick={() => setConfirmClearOpen(false)}
+                  className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-gray-400"
+                >
+                  Cancel
+                </button>
+                <button
+                  type = "button"
+                  onClick={async () => {
+                    if (activeConversationId) {
+                      await clearConversation(activeConversationId);
+                      setDbMessages([]);
+                    }
+                    setConfirmClearOpen(false);
+                  }}
+                  className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+                >
+                  Clear
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Chat Area */}
         <section className="flex flex-1 flex-col ml-4 mr-4 rounded-lg border-2 border-[#9a3015] p-4 bg-[#fff5f5]">
           <div
@@ -398,10 +430,7 @@ export default function ChatPage() {
             {activeConversationId && (
               <button
                 type="button"
-                onClick={async () => {
-                  await clearConversation(activeConversationId);
-                  setDbMessages([]);
-                }}
+                onClick={() => setConfirmClearOpen(true)}
                 className="px-4 py-2 bg-[#fb0000] text-white rounded hover:bg-[#450f01]"
               >
                 Clear
