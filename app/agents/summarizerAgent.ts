@@ -1,10 +1,11 @@
 import type { BaseMessage } from "@langchain/core/messages";
 import { AIMessage, HumanMessage, SystemMessage } from "@langchain/core/messages";
 import { ChatOpenAI } from "@langchain/openai";
+import { updateSummarize } from "@/lib/chats"; 
 
 const model = new ChatOpenAI({ modelName: "gpt-4o-mini", temperature: 0 });
 
-export async function summarizerNode(state: { messages: BaseMessage[]; summary: string }) {
+export async function summarizerNode(state: { messages: BaseMessage[]; summary: string; conversationId: string; }) {
 
     // Select all conversation until (but not including) the 6th HumanMessage
     let humanCount = 0;
@@ -37,5 +38,10 @@ export async function summarizerNode(state: { messages: BaseMessage[]; summary: 
     const response = await model.invoke(prompt);
     const newSummary = String(response.content).trim();
 
-    return { summary: newSummary };
+     // ✅ Write to Supabase here
+    if (state.conversationId) {
+        await updateSummarize(state.conversationId, newSummary);
+    }
+
+    return { };
 }

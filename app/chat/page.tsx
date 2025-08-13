@@ -35,13 +35,6 @@ function LoadingDots() {
   );
 }
 
-/**
- * Parse message.content that may be:
- *  - a plain string
- *  - a JSON string like {"output":"...","route":"news","title":""}
- *  - an object in that same shape
- *  - an array of parts from the AI SDK
- */
 type AssistantJSON = {
   output?: string;
   route?: string;
@@ -52,7 +45,9 @@ function isAssistantJSON(value: unknown): value is AssistantJSON {
   return (
     typeof value === "object" &&
     value !== null &&
-    ("output" in value || "route" in value || "title" in value)
+    ("output" in (value as object) ||
+      "route" in (value as object) ||
+      "title" in (value as object))
   );
 }
 
@@ -61,7 +56,7 @@ export function parseAssistantContent(content: unknown): { text: string; route?:
     try {
       const parsed = JSON.parse(content) as unknown;
       if (isAssistantJSON(parsed)) {
-        return { text: String(parsed.output ?? ""), route: parsed.route };
+        return { text: String((parsed as AssistantJSON).output ?? ""), route: (parsed as AssistantJSON).route };
       }
       return { text: content };
     } catch {
@@ -70,7 +65,8 @@ export function parseAssistantContent(content: unknown): { text: string; route?:
   }
 
   if (isAssistantJSON(content)) {
-    return { text: String(content.output ?? ""), route: content.route };
+    const c = content as AssistantJSON;
+    return { text: String(c.output ?? ""), route: c.route };
   }
 
   if (Array.isArray(content)) {
@@ -102,7 +98,6 @@ export default function ChatPage() {
   const [loading, setLoading] = useState(true);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
-
   const [dbMessages, setDbMessages] = useState<DBMessage[]>([]);
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
@@ -110,18 +105,30 @@ export default function ChatPage() {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
 
-  const { input, setInput, append, isLoading } = useChat({
+  // Helper: update or append assistant bubble
+  function updateOrAppendAssistantMessage(text: string, route?: string) {
+    setDbMessages((prev) => {
+      if (prev.length > 0 && prev[prev.length - 1].sender === "assistant") {
+        return [
+          ...prev.slice(0, -1),
+          { ...prev[prev.length - 1], text, route: route ?? prev[prev.length - 1].route },
+        ];
+      }
+      return [...prev, { id: Date.now(), sender: "assistant", text, route }];
+    });
+  }
+
+  const { input, setInput, append, isLoading, messages } = useChat({
     api: "/api/chat",
     body: { conversationId: activeConversationId },
-    streamProtocol: "text",
+    streamProtocol: "data",
     onResponse: async (res) => {
       if (!res.ok) console.error("Chat error", await res.text());
     },
-    // Append assistant reply into dbMessages AND persist it to Supabase
     onFinish: async (message) => {
       try {
         const { text, route } = parseAssistantContent(message.content);
-        // 1) Persist bot message to DB
+
         if (activeConversationId) {
           await appendMessageToConversation(activeConversationId, {
             sender: "assistant",
@@ -130,13 +137,6 @@ export default function ChatPage() {
           });
         }
 
-        // 2) Update UI (optimistic/local)
-        setDbMessages((prev) => [
-          ...prev,
-          { id: Date.now(), sender: "assistant", text, route },
-        ]);
-
-        // 3) Refresh sidebar titles
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
           const convs = await fetchUserConversations(user.id);
@@ -150,12 +150,24 @@ export default function ChatPage() {
     },
   });
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: dependency is not needed
+  useEffect(() => {
+    if (isLoading) {
+      const lastAssistantMsg = [...messages].reverse().find((m) => m.role === "assistant");
+      if (lastAssistantMsg) {
+        const { text, route } = parseAssistantContent(lastAssistantMsg.content);
+        updateOrAppendAssistantMessage(text, route);
+      } else {
+        updateOrAppendAssistantMessage(""); // placeholder bubble
+      }
+    }
+  }, [messages, isLoading]);
+
   // biome-ignore lint/correctness/useExhaustiveDependencies: messages dependency is needed for scroll behavior
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [dbMessages]);
 
-  // auth check
   useEffect(() => {
     const checkAuth = async () => {
       const { data } = await supabase.auth.getSession();
@@ -168,12 +180,10 @@ export default function ChatPage() {
     checkAuth();
   }, [router]);
 
-  // load conversations list
   useEffect(() => {
     const fetchConversationsList = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
-
       try {
         const conversations = await fetchUserConversations(user.id);
         setConversations(conversations ?? []);
@@ -194,8 +204,8 @@ export default function ChatPage() {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const mediaRecorder = new MediaRecorder(stream);
       mediaRecorderRef.current = mediaRecorder;
-
       audioChunksRef.current = [];
+
       mediaRecorder.ondataavailable = (event) => audioChunksRef.current.push(event.data);
 
       mediaRecorder.onstop = async () => {
@@ -239,12 +249,13 @@ export default function ChatPage() {
   };
 
   const onSubmit = async (e: React.FormEvent) => {
+    messages.length = 0;
     e.preventDefault();
     if (!input.trim() || !activeConversationId) return;
 
     const text = input.trim();
+    setInput("");
 
-    // optimistic user message in UI
     const userMessage: DBMessage = {
       id: Date.now(),
       sender: "user",
@@ -252,17 +263,16 @@ export default function ChatPage() {
     };
     setDbMessages((prev) => [...prev, userMessage]);
 
-    // persist user message
     try {
       await appendMessageToConversation(activeConversationId, { sender: "user", text });
     } catch (err) {
       console.error("Failed to persist user message:", err);
     }
 
-    // stream assistant reply (server may also persist; we persist again above for safety)
-    await append({ role: "user", content: text }, { body: { conversationId: activeConversationId } });
-
-    setInput("");
+    await append(
+      { role: "user", content: text },
+      { body: { conversationId: activeConversationId } }
+    );
   };
 
   if (loading) {
@@ -351,19 +361,14 @@ export default function ChatPage() {
                       : "bg-[#fff5f5] text-black border border-[#9a3015]"
                   }`}
                 >
-                  {msg.text}
+                  {msg.text || (
+                    <span className="italic">
+                      R2-D2 is sending message to Dagobah <LoadingDots />
+                    </span>
+                  )}
                 </span>
               </div>
             ))}
-
-            {isLoading && (
-              <div className="flex flex-col items-start">
-                <span className="px-4 py-2 rounded-lg bg-[#fff5f5] text-black border border-[#9a3015] italic">
-                  R2-D2 is sending message to Dagobah
-                  <LoadingDots />
-                </span>
-              </div>
-            )}
 
             <div ref={messagesEndRef} />
           </div>
