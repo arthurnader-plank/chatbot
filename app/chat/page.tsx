@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { useEffect, useState, useRef } from "react";
 import { useChat } from "@ai-sdk/react";
 import {
@@ -370,6 +371,20 @@ export default function ChatPage() {
             className="flex-1 p-4 space-y-2 overflow-y-auto"
             style={{ maxHeight: "calc(100vh - 140px)" }}
           >
+            {!activeConversationId ? (
+            <div className="flex flex-col items-center justify-center h-full text-center text-gray-700">
+              <Image
+                src="/yoda.jpg"
+                alt="Yoda"
+                width={562} // same as w-48 (48 * 4 = 192px)
+                height={760}
+                className="w-72 h-auto mb-4 rounded-lg shadow-lg"
+              />
+              <p className="max-w-md text-lg italic">
+                To start your journey, select a previous conversation or begin a new one, you must, my Padawan.
+              </p>
+            </div>
+          ) : ( <>
             {dbMessages.map((msg, idx) => (
               <div
                 key={msg.id ?? `${msg.sender}-${idx}`}
@@ -403,31 +418,36 @@ export default function ChatPage() {
             ))}
 
             <div ref={messagesEndRef} />
+          </>
+          )}
           </div>
 
           {/* Input */}
-          <form onSubmit={onSubmit} className="flex p-2 space-x-2 m-4">
-            <input
-              type="text"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder="Type a message..."
-              className="flex-1 px-4 py-2 border border-[#9a3015] rounded-xl focus:outline-none focus:ring focus:ring-[#9a3015] text-black"
-            />
-            <button
-              type="button"
-              onClick={toggleRecording}
-              className={`px-4 py-2 rounded ${recording ? "bg-red-300 animate-pulse" : "bg-green-800"} text-white`}
-            >
-              {recording ? "Stop" : "Rec"}
-            </button>
-            <button
-              type="submit"
-              className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-[#9a3015]"
-            >
-              Send
-            </button>
-            {activeConversationId && (
+          
+          {activeConversationId && (
+            <form onSubmit={onSubmit} className="flex p-2 space-x-2 m-4">
+              <input
+                type="text"
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                placeholder="Type a message..."
+                className="flex-1 px-4 py-2 border border-[#9a3015] rounded-xl focus:outline-none focus:ring focus:ring-[#9a3015] text-black"
+              />
+              <button
+                type="button"
+                onClick={toggleRecording}
+                className={`px-4 py-2 rounded ${
+                  recording ? "bg-red-300 animate-pulse" : "bg-green-800"
+                } text-white`}
+              >
+                {recording ? "Stop" : "Rec"}
+              </button>
+              <button
+                type="submit"
+                className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-[#9a3015]"
+              >
+                Send
+              </button>
               <button
                 type="button"
                 onClick={() => setConfirmClearOpen(true)}
@@ -435,8 +455,8 @@ export default function ChatPage() {
               >
                 Clear
               </button>
-            )}
-          </form>
+            </form>
+          )}
         </section>
       </div>
     </main>
