@@ -7,19 +7,12 @@ import {
   type BaseMessage,
 } from "@langchain/core/messages";
 
+import type { DBMessage } from "@/types/chat"
 import {
   incrementConversationTurn,
   loadConversation,
 } from "@/lib/chats";
 import { graph } from "@/app/graph/graph";
-// -------------- Types --------------
-
-interface DBMessage {
-  id: number;
-  sender: string;
-  text: string;
-  route?: string;
-}
 
 export async function POST(req: Request) {
   const { conversationId } = await req.json();

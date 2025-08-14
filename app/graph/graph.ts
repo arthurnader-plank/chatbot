@@ -12,7 +12,6 @@ import { summarizerNode } from "@/app/agents/summarizerAgent";
 import { titleNode } from "@/app/agents/titleAgent";
 import { weatherNode } from "@/app/agents/weatherAgent";
 
-// -------------- Graph State --------------
 const StateAnnotation = Annotation.Root({
     messages: Annotation<BaseMessage[]>({
         reducer: (existing, update) => existing.concat(Array.isArray(update) ? update : [update]),
@@ -53,12 +52,12 @@ export const graph = new StateGraph(StateAnnotation)
         { titleNode: "titleNode", router: "router" }
     )
     .addConditionalEdges("router", (state) => state.route, {
-    weather: "weatherNode",
-    news: "newsNode",
-    chat: "chat",
+        weather: "weatherNode",
+        news: "newsNode",
+        chat: "chat",
     })
     .addEdge("titleNode", "router")
-        .addEdge("weatherNode", "chat")
+    .addEdge("weatherNode", "chat")
     .addEdge("newsNode", "chat")
     .addConditionalEdges("chat", (state) => {
         const turn = state.turn;

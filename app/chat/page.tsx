@@ -12,38 +12,13 @@ import {
   loadConversation,
 } from "@/lib/chats";
 import { supabase } from "@/lib/supabaseClient";
+import type { Conversation, DBMessage} from "@/types/chat"
+import Sidebar from "@/components/Sidebar";
+import ChatInput from "@/components/ChatInput";
+import { normalizeMessages, updateOrAppendAssistantMessage } from "@/utils/messages";
+import LoadingDots from "@/components/LoadingDots";
+import DialogBox from "@/components/DialogBox";
 
-interface DBMessage {
-  id: number;
-  sender: "user" | "assistant";
-  text: string;
-  route?: string;
-}
-
-interface Conversation {
-  id: string;
-  title: string;
-  created_at: string;
-}
-
-function LoadingDots() {
-  return (
-    <span className="inline-flex ml-2">
-      <span className="dot animate-bounce delay-0">.</span>
-      <span className="dot animate-bounce delay-150">.</span>
-      <span className="dot animate-bounce delay-300">.</span>
-    </span>
-  );
-}
-
-function normalizeMessages(msgs: Partial<DBMessage>[]): DBMessage[] {
-  return (msgs || []).map((m, idx) => ({
-    id: typeof m.id === "number" ? m.id : idx + 1,
-    sender: (m.sender as DBMessage["sender"]) ?? "assistant",
-    text: m.text ?? "",
-    route: m.route,
-  }));
-}
 
 export default function ChatPage() {
   const router = useRouter();
@@ -57,19 +32,6 @@ export default function ChatPage() {
   const [recording, setRecording] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
-
-  // Helper: update or append assistant bubble
-  function updateOrAppendAssistantMessage(text: string, route?: string) {
-    setDbMessages((prev) => {
-      if (prev.length > 0 && prev[prev.length - 1].sender === "assistant") {
-        return [
-          ...prev.slice(0, -1),
-          { ...prev[prev.length - 1], text, route: route ?? prev[prev.length - 1].route },
-        ];
-      }
-      return [...prev, { id: Date.now(), sender: "assistant", text, route }];
-    });
-  }
 
   const { input, setInput, append, isLoading, messages } = useChat({
     api: "/api/chat",
@@ -86,7 +48,7 @@ export default function ChatPage() {
         const route = annotation?.route ?? "chat";
         console.log(route)
 
-        updateOrAppendAssistantMessage(text, route);
+        updateOrAppendAssistantMessage(setDbMessages, text, route);
 
         if (activeConversationId) {
           await appendMessageToConversation(activeConversationId, {
@@ -109,14 +71,13 @@ export default function ChatPage() {
     },
   });
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: dependency is not needed
   useEffect(() => {
     if (isLoading) {
       const lastAssistantMsg = [...messages].reverse().find((m) => m.role === "assistant");
       if (lastAssistantMsg) {
-        updateOrAppendAssistantMessage(lastAssistantMsg.content);
+        updateOrAppendAssistantMessage(setDbMessages, lastAssistantMsg.content);
       } else {
-        updateOrAppendAssistantMessage(""); // placeholder bubble
+        updateOrAppendAssistantMessage(setDbMessages, ""); // placeholder bubble
       }
     }
   }, [messages, isLoading]);
@@ -246,79 +207,29 @@ export default function ChatPage() {
   return (
     <main className="flex h-screen w-full bg-[#fff5f5] p-4">
       <div className="flex flex-1 bg-[#fff5f5] rounded-lg shadow">
-        {/* Sidebar */}
-        <aside className="w-64 bg-[#450f01] p-4 hidden md:flex flex-col rounded-lg shadow h-full text-white">
-          <div className="flex space-x-2 mb-4">
-            <button
-              type="button"
-              onClick={newChat}
-              className="px-3 py-2 bg-blue-500 text-white rounded hover:bg-[#9a3015]"
-            >
-              + New Chat
-            </button>
-            <button
-              type="button"
-              onClick={handleLogout}
-              className="px-3 py-2 bg-[#fb0000] text-white rounded hover:bg-[#450f01]"
-            >
-              Logout
-            </button>
-          </div>
-
-          <h2 className="font-bold mb-4 text-white">Previous Chats</h2>
-
-          <div className="flex-1 overflow-y-auto space-y-2">
-            {conversations.length > 0 ? (
-              conversations.map((conv) => (
-                <button
-                  type="button"
-                  key={conv.id}
-                  className={`w-full max-w-[200px] truncate text-left p-2 rounded shadow cursor-pointer transition 
-                    ${
-                      activeConversationId === conv.id
-                        ? "bg-[#9a3015] text-white"
-                        : "bg-[#fff5f5] text-black hover:bg-[#9a3015] hover:text-white"
-                    }`}
-                  onClick={() => handleLoadConversation(conv.id)}
-                >
-                  {conv.title}
-                </button>
-              ))
-            ) : (
-              <p className="text-sm text-white">No previous conversations</p>
-            )}
-          </div>
-        </aside>
+        <Sidebar
+          conversations={conversations}
+          activeConversationId={activeConversationId}
+          onNewChat={newChat}
+          onLogout={handleLogout}
+          onLoadConversation={handleLoadConversation}
+        />
 
         {confirmClearOpen && (
-          <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
-            <div className="bg-white p-6 rounded-lg shadow-lg max-w-sm w-full">
-              <h2 className="text-lg text-black font-semibold mb-4">Are you sure?</h2>
-              <p className="mb-6 text-black">Clear the conversation, you will. Certain, are you?</p>
-              <div className="flex justify-end space-x-2">
-                <button
-                  type = "button"
-                  onClick={() => setConfirmClearOpen(false)}
-                  className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-gray-400"
-                >
-                  Cancel
-                </button>
-                <button
-                  type = "button"
-                  onClick={async () => {
-                    if (activeConversationId) {
-                      await clearConversation(activeConversationId);
-                      setDbMessages([]);
-                    }
-                    setConfirmClearOpen(false);
-                  }}
-                  className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
-                >
-                  Clear
-                </button>
-              </div>
-            </div>
-          </div>
+          <DialogBox
+            title="Are you sure?"
+            message="Clear the conversation, you will. Certain, are you?"
+            confirmText="Clear"
+            cancelText="Cancel"
+            onCancel={() => setConfirmClearOpen(false)}
+            onConfirm={async () => {
+              if (activeConversationId) {
+                await clearConversation(activeConversationId);
+                setDbMessages([]);
+              }
+              setConfirmClearOpen(false);
+            }}
+          />
         )}
 
         {/* Chat Area */}
@@ -381,37 +292,14 @@ export default function ChatPage() {
           {/* Input */}
           
           {activeConversationId && (
-            <form onSubmit={onSubmit} className="flex p-2 space-x-2 m-4">
-              <input
-                type="text"
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                placeholder="Type a message..."
-                className="flex-1 px-4 py-2 border border-[#9a3015] rounded-xl focus:outline-none focus:ring focus:ring-[#9a3015] text-black"
-              />
-              <button
-                type="button"
-                onClick={toggleRecording}
-                className={`px-4 py-2 rounded ${
-                  recording ? "bg-red-300 animate-pulse" : "bg-green-800"
-                } text-white`}
-              >
-                {recording ? "Stop" : "Rec"}
-              </button>
-              <button
-                type="submit"
-                className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-[#9a3015]"
-              >
-                Send
-              </button>
-              <button
-                type="button"
-                onClick={() => setConfirmClearOpen(true)}
-                className="px-4 py-2 bg-[#fb0000] text-white rounded hover:bg-[#450f01]"
-              >
-                Clear
-              </button>
-            </form>
+            <ChatInput
+              input={input}
+              setInput={setInput}
+              onSubmit={onSubmit}
+              onToggleRecording={toggleRecording}
+              recording={recording}
+              onClear={() => setConfirmClearOpen(true)}
+            />
           )}
         </section>
       </div>
