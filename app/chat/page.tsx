@@ -36,55 +36,6 @@ function LoadingDots() {
   );
 }
 
-type AssistantJSON = {
-  output?: string;
-  route?: string;
-  title?: string;
-};
-
-function isAssistantJSON(value: unknown): value is AssistantJSON {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    ("output" in (value as object) ||
-      "route" in (value as object) ||
-      "title" in (value as object))
-  );
-}
-
-export function parseAssistantContent(content: unknown): { text: string; route?: string } {
-  if (typeof content === "string") {
-    try {
-      const parsed = JSON.parse(content) as unknown;
-      if (isAssistantJSON(parsed)) {
-        return { text: String((parsed as AssistantJSON).output ?? ""), route: (parsed as AssistantJSON).route };
-      }
-      return { text: content };
-    } catch {
-      return { text: content };
-    }
-  }
-
-  if (isAssistantJSON(content)) {
-    const c = content as AssistantJSON;
-    return { text: String(c.output ?? ""), route: c.route };
-  }
-
-  if (Array.isArray(content)) {
-    const text = content
-      .map((p) => {
-        if (p && typeof p === "object" && "type" in p && (p as { type?: string }).type === "text") {
-          return (p as { text?: string }).text ?? "";
-        }
-        return "";
-      })
-      .join("");
-    return { text };
-  }
-
-  return { text: "" };
-}
-
 function normalizeMessages(msgs: Partial<DBMessage>[]): DBMessage[] {
   return (msgs || []).map((m, idx) => ({
     id: typeof m.id === "number" ? m.id : idx + 1,
@@ -128,14 +79,20 @@ export default function ChatPage() {
       if (!res.ok) console.error("Chat error", await res.text());
     },
     onFinish: async (message) => {
+      console.log(message);
       try {
-        const { text, route } = parseAssistantContent(message.content);
+        const text = message.content;
+        const annotation = message?.annotations?.[0] as { route?: string; agent?: string } | undefined;
+        const route = annotation?.route ?? "chat";
+        console.log(route)
+
+        updateOrAppendAssistantMessage(text, route);
 
         if (activeConversationId) {
           await appendMessageToConversation(activeConversationId, {
             sender: "assistant",
             text,
-            route: route ?? "chat",
+            route,
           });
         }
 
@@ -157,8 +114,7 @@ export default function ChatPage() {
     if (isLoading) {
       const lastAssistantMsg = [...messages].reverse().find((m) => m.role === "assistant");
       if (lastAssistantMsg) {
-        const { text, route } = parseAssistantContent(lastAssistantMsg.content);
-        updateOrAppendAssistantMessage(text, route);
+        updateOrAppendAssistantMessage(lastAssistantMsg.content);
       } else {
         updateOrAppendAssistantMessage(""); // placeholder bubble
       }

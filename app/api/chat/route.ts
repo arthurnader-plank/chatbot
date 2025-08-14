@@ -202,25 +202,34 @@ export async function POST(req: Request) {
     execute: async (dataStream) => {
       try {
         let currentNode: string | null = null;
-        const targetNode = "chat"; // <-- the only node to stream from
-  
+        const targetNode = "chat";
+    
+        let finalRoute: "weather" | "news" | "chat" = "chat"; // ← default
+        let routeSeen = false;
+    
         for await (const evt of events) {
           const md = evt.metadata as { langgraph_node?: string } | undefined;
           const nodeName = md?.langgraph_node ?? null;
-  
-          // ✅ Skip all events not from the target node
+    
+          // ✅ Detect agent and store route
+          if (!routeSeen && nodeName === "weatherNode") {
+            finalRoute = "weather";
+            routeSeen = true;
+          }
+    
+          if (!routeSeen && nodeName === "newsNode") {
+            finalRoute = "news";
+            routeSeen = true;
+          }
+    
+          // ✅ Skip other nodes
           if (nodeName !== targetNode) continue;
-  
+    
+          // ✅ Stream chat tokens
           if (evt.event === "on_chat_model_stream" && evt.data?.chunk) {
-            const chunk = evt.data.chunk; // AIMessageChunk
-  
-            // annotate once when node starts streaming
-            if (nodeName && nodeName !== currentNode) {
-              currentNode = nodeName;
-              dataStream.writeMessageAnnotation({ agent: currentNode });
-            }
-  
-            // normalize token content
+            const chunk = evt.data.chunk;
+    
+            // Stream tokens
             const token = Array.isArray(chunk.content)
               ? chunk.content
                   .map((p: string | { text?: string }) =>
@@ -228,12 +237,19 @@ export async function POST(req: Request) {
                   )
                   .join("")
               : String(chunk.content ?? "");
-  
-            // send token
+    
             dataStream.write(`0:${JSON.stringify(token)}\n`);
+    
+            // ✅ Write annotation *once* at the beginning of chatNode
+            if (nodeName && nodeName !== currentNode) {
+              currentNode = nodeName;
+              dataStream.writeMessageAnnotation({
+                route: finalRoute,
+                agent: "chat",
+              });
+            }
           }
         }
-        
       } catch (err) {
         console.error("Streaming error:", err);
       }

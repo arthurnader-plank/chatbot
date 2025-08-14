@@ -19,7 +19,7 @@ export default function LoginPage() {
       alert(`Login failed: ${error.message}`);
     } else {
       const audio = new Audio("/login.mp3");
-      console.log(audio);
+ 
       audio.volume = 0.35;
       audio.play();
       setTimeout(() => {
